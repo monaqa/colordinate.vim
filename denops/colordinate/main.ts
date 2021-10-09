@@ -2,29 +2,47 @@ import { Denops } from "https://deno.land/x/denops_std@v2.0.1/mod.ts";
 import * as fn from "https://deno.land/x/denops_std@v2.0.1/function/mod.ts";
 import * as autocmd from "https://deno.land/x/denops_std@v2.0.1/autocmd/mod.ts";
 import {
-  isObject,
   ensureObject,
+  isObject,
 } from "https://deno.land/x/unknownutil@v1.1.0/mod.ts";
 import * as helper from "https://deno.land/x/denops_std@v2.0.1/helper/mod.ts";
-import { parse, stringify } from "https://deno.land/std@0.110.0/encoding/yaml.ts";
+import {
+  parse,
+  stringify,
+} from "https://deno.land/std@0.110.0/encoding/yaml.ts";
 
 type HighlightName = string;
-type HighlightAttr = "bold" | "italic" | "reverse" | "standout" | "underline" | "undercurl" | "strikethrough";
-const HIGHLIGHT_ATTRS: HighlightAttr[] = ["bold" , "italic" , "reverse" , "standout" , "underline" , "undercurl" , "strikethrough"];
+type HighlightAttr =
+  | "bold"
+  | "italic"
+  | "reverse"
+  | "standout"
+  | "underline"
+  | "undercurl"
+  | "strikethrough";
+const HIGHLIGHT_ATTRS: HighlightAttr[] = [
+  "bold",
+  "italic",
+  "reverse",
+  "standout",
+  "underline",
+  "undercurl",
+  "strikethrough",
+];
 
 // type ColorConfigDict = Record<HighlightName, ColorConfig>;
 type ColorConfig = {
-  color?: { fg?: string; bg?: string },
-  style?: HighlightAttr[],
-  links?: HighlightName[],
+  color?: { fg?: string; bg?: string };
+  style?: HighlightAttr[];
+  links?: HighlightName[];
 };
 
 function isColorConfig(x: unknown): x is ColorConfig {
   if (!isObject(x)) {
-    return false
+    return false;
   }
   if ("color" in x) {
-    if (!isObject(x["color"])) {return false}
+    if (!isObject(x["color"])) return false;
   }
   return true;
 }
@@ -53,17 +71,19 @@ class ColorConfigDict {
       let ctermstr = (conf.style ?? []).join(",");
       ctermstr = ctermstr === "" ? "NONE" : ctermstr;
 
-      const links = (conf.links ?? []).map((linkName) => `hi! link ${linkName} ${key}`);
+      const links = (conf.links ?? []).map((linkName) =>
+        `hi! link ${linkName} ${key}`
+      );
 
       return [
         `hi! ${key} guifg=${fg} guibg=${bg} gui=${ctermstr}`,
-        ...links
+        ...links,
       ].join("\n");
     }).join("\n");
   }
 
   toYaml(): string {
-    return stringify(this.record, {skipInvalid: true})
+    return stringify(this.record, { skipInvalid: true });
   }
 
   static async getCurrentConfig(denops: Denops): Promise<ColorConfigDict> {
@@ -78,18 +98,33 @@ class ColorConfigDict {
 
       if (synId == transId) {
         if (record[name] == undefined) {
-          record[name] = {}
+          record[name] = {};
         }
 
-        let fg: string | undefined = await fn.synIDattr(denops, synId, "fg", "gui") as string;
-        fg = fg == '' ? undefined : fg;
-        let bg: string | undefined = await fn.synIDattr(denops, synId, "bg", "gui") as string;
-        bg = bg == '' ? undefined : bg;
+        let fg: string | undefined = await fn.synIDattr(
+          denops,
+          synId,
+          "fg",
+          "gui",
+        ) as string;
+        fg = fg == "" ? undefined : fg;
+        let bg: string | undefined = await fn.synIDattr(
+          denops,
+          synId,
+          "bg",
+          "gui",
+        ) as string;
+        bg = bg == "" ? undefined : bg;
         record[name]["color"] = { fg, bg };
 
         const style: HighlightAttr[] = [];
         for (const attr of HIGHLIGHT_ATTRS) {
-          const existsAttr = await fn.synIDattr(denops, synId, attr, "gui") as number;
+          const existsAttr = await fn.synIDattr(
+            denops,
+            synId,
+            attr,
+            "gui",
+          ) as number;
           if (existsAttr == 1) {
             style.push(attr);
           }
@@ -97,11 +132,15 @@ class ColorConfigDict {
         if (style.length > 0) {
           record[name]["style"] = style;
         }
-
       } else {
-        const transName = await fn.synIDattr(denops, transId, "name", "gui") as string;
+        const transName = await fn.synIDattr(
+          denops,
+          transId,
+          "name",
+          "gui",
+        ) as string;
         if (record[transName] == undefined) {
-          record[transName] = {}
+          record[transName] = {};
         }
         if (record[transName]["links"] == undefined) {
           record[transName]["links"] = [name];
@@ -134,7 +173,10 @@ class ColordinateBuffer {
       // `${cmd} ${await fn.fnameescape(denops, name) as string}`,
       `${cmd} ${name}`,
     );
-    const id = await fn.bufnr(denops, await fn.fnameescape(denops, name) as string);
+    const id = await fn.bufnr(
+      denops,
+      await fn.fnameescape(denops, name) as string,
+    );
 
     await fn.setbufvar(denops, id, "&buftype", "acfile");
     await fn.setbufvar(denops, id, "&bufhidden", "wipe");
@@ -149,7 +191,11 @@ class ColordinateBuffer {
 
     await autocmd.group(denops, "colordinate", (helper) => {
       helper.remove("*", "<buffer>");
-      helper.define("BufWriteCmd", "<buffer>", `call denops#notify("${denops.name}", "reflect", [])`)
+      helper.define(
+        "BufWriteCmd",
+        "<buffer>",
+        `call denops#notify("${denops.name}", "reflect", [])`,
+      );
     });
 
     return new ColordinateBuffer(denops, name, id);
@@ -169,11 +215,9 @@ class ColordinateBuffer {
     await fn.deletebufline(this.denops, this.id, 1, "$");
     await fn.appendbufline(this.denops, this.id, 0, lines);
   }
-
 }
 
 export async function main(denops: Denops): Promise<void> {
-
   let buffer: ColordinateBuffer | null = null;
 
   denops.dispatcher = {
@@ -183,16 +227,19 @@ export async function main(denops: Denops): Promise<void> {
 
     async reflect() {
       if (buffer == null) {
-        return
+        return;
       }
       const text = (await buffer.getLines()).join("\n");
       const conf = ColorConfigDict.parse(text);
-      await helper.execute(denops, `
+      await helper.execute(
+        denops,
+        `
       if exists('syntax_on')
         syntax reset
       endif
       let g:colors_name = 'colordinate'
-      `);
+      `,
+      );
       await helper.execute(denops, conf.toScript());
       await buffer.resetModified();
     },
@@ -202,12 +249,11 @@ export async function main(denops: Denops): Promise<void> {
       const conf = await ColorConfigDict.getCurrentConfig(denops);
       await buffer.setText(conf.toYaml());
       await buffer.resetModified();
-    }
-  }
+    },
+  };
 
-  await helper.execute(denops,
-  `
-  command! ColordinateLoad call denops#request("${denops.name}", "load", [])
-  `);
-
+  await helper.execute(
+    denops,
+    `command! ColordinateLoad call denops#request("${denops.name}", "load", [])`,
+  );
 }
