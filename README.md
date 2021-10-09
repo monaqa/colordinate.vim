@@ -12,3 +12,7 @@ To open the `[Colordinate]` buffer, the buffer for editing color scheme, do this
 ```
 
 Just do `:w` on the buffer and the changes will be reflected immediately.
+
+## Demo
+
+![demo-colordinate](https://user-images.githubusercontent.com/48883418/136647286-1a84b3b3-6753-4846-aa56-f479db0a1ec2.gif)
